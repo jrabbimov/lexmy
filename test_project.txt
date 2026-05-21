@@ -1,0 +1,50 @@
+LexMY — Test Queries
+====================
+
+Create a project first:
+  Business name : Apex Fintech Sdn Bhd
+  Industry      : fintech
+  Business form : Private company (Sdn Bhd)
+
+────────────────────────────────────────────────────────────
+
+PDPA / Data Privacy
+───────────────────
+1. We collect customers' IC numbers and phone numbers during onboarding. What are our obligations under PDPA?
+
+2. A customer asked us to delete all their personal data. Are we legally required to do that?
+
+3. We want to share our user database with a third-party marketing firm. Is that allowed under PDPA?
+
+4. Our server was hacked and 5,000 customer records were leaked. What must we do?
+
+5. Can we transfer customer data to our parent company in Singapore?
+
+
+Companies Act (Sdn Bhd)
+───────────────────────
+6. What are the minimum requirements to register a private company in Malaysia?
+
+7. We have two directors — one wants to resign. Can a company operate with only one director?
+
+8. What documents must we file with SSM every year?
+
+9. We want to pay dividends to shareholders. What conditions must be met?
+
+10. One of our shareholders wants to sell their shares to an outsider. What restrictions apply?
+
+
+Tax
+───
+11. What is the corporate tax rate for a small company in Malaysia?
+
+12. We missed the deadline to submit our tax return. What are the penalties?
+
+13. Are there any tax incentives for fintech startups in Malaysia?
+
+
+Cross-act (compound)
+─────────────────────
+14. We are expanding and want to hire 10 employees and collect their salary data — what are our obligations under employment law and PDPA?
+
+15. We want to hold a board meeting and also update our company address with SSM. What are the procedures and deadlines?

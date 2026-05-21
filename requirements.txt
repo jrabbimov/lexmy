@@ -1,0 +1,9 @@
+streamlit>=1.32
+streamlit-cookies-manager>=0.2.0
+libsql-client>=0.3.1
+openai>=1.30
+chromadb>=0.5
+sentence-transformers>=2.7
+networkx>=3.2
+pandas>=2.0
+torchvision

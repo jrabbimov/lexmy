@@ -1,0 +1,11 @@
+[server]
+# Don't watch heavy ML packages — prevents transformers __path__ warnings
+folderWatchBlacklist = [
+    "transformers",
+    "sentence_transformers",
+    "torch",
+    "torchvision",
+    "chromadb",
+    "onnxruntime",
+    "tokenizers",
+]
