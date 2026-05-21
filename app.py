@@ -5,7 +5,8 @@ import re
 import sys
 import uuid
 
-# Suppress transformers __path__ alias warnings (triggered by Streamlit's watcher)
+# Suppress transformers __path__ alias warnings before any import touches the lib
+os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
 logging.getLogger("transformers").setLevel(logging.ERROR)
 
 import streamlit as st

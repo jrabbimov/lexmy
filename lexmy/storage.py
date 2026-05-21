@@ -23,7 +23,7 @@ def make_client():
 
 def _exec(client, sql: str, params: list = None):
     """Execute and return cursor."""
-    return client.execute(sql, params or [])
+    return client.execute(sql, tuple(params) if params else ())
 
 
 def _commit(client):
