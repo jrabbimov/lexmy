@@ -8,20 +8,22 @@ from .prompt import SYSTEM_PROMPT, SUMMARY_PROMPT
 
 # ── Backend config ────────────────────────────────────────────────────────────
 
-NIM_BASE = "https://integrate.api.nvidia.com/v1"
-NIM_MODEL = "deepseek-ai/deepseek-v4-flash"
-LMSTUDIO_BASE = "http://localhost:1234/v1"
-LMSTUDIO_MODEL = "qwen/qwen3.5-2b"
+NIM_BASE          = "https://integrate.api.nvidia.com/v1"
+NIM_MODEL_DEFAULT = "deepseek-ai/deepseek-r1"
+LMSTUDIO_BASE     = "http://localhost:1234/v1"
+LMSTUDIO_MODEL    = "qwen/qwen3.5-2b"
 
 
 def make_client(backend: str = "nim", api_key: str = "") -> tuple:
     """
     Returns (OpenAI client, model_name, disable_thinking_flag).
     backend: 'nim' or 'lmstudio'
+    NIM model can be overridden via NIM_MODEL env var.
     """
     if backend == "nim":
-        key = api_key or os.environ.get("NIM_API_KEY", "") or "no-key-set"
-        return OpenAI(base_url=NIM_BASE, api_key=key), NIM_MODEL, True
+        key   = api_key or os.environ.get("NIM_API_KEY", "") or "no-key-set"
+        model = os.environ.get("NIM_MODEL", NIM_MODEL_DEFAULT)
+        return OpenAI(base_url=NIM_BASE, api_key=key), model, True
     elif backend == "lmstudio":
         return (
             OpenAI(base_url=LMSTUDIO_BASE, api_key="lm-studio"),
