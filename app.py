@@ -2,7 +2,6 @@
 import logging
 import os
 import re
-import sys
 import uuid
 
 # Suppress transformers __path__ alias warnings before any import touches the lib
@@ -15,13 +14,6 @@ from streamlit_cookies_manager import EncryptedCookieManager
 from lexmy import storage, memory, retrieval
 from lexmy.llm import make_client
 from lexmy.rag import rag_answer
-
-
-# ── Mode: --cloud flag ────────────────────────────────────────────────────────
-# Run locally:  uv run streamlit run app.py
-# Run cloud:    uv run streamlit run app.py -- --cloud
-
-CLOUD_MODE = "--cloud" in sys.argv
 
 
 # ── Page setup ────────────────────────────────────────────────────────────────
@@ -39,12 +31,15 @@ def _secret(key: str, default: str = "") -> str:
         return os.environ.get(key, default)
 
 
-if CLOUD_MODE:
-    # Push cloud secrets into env so libsql_client + OpenAI picks them up
-    for k in ("TURSO_URL", "TURSO_TOKEN", "NIM_API_KEY", "COOKIE_PASSWORD"):
-        v = _secret(k)
-        if v:
-            os.environ[k] = v
+# Always push secrets into env — works locally (secrets.toml) and on cloud
+for k in ("TURSO_URL", "TURSO_TOKEN", "NIM_API_KEY", "NIM_MODEL", "COOKIE_PASSWORD"):
+    v = _secret(k)
+    if v:
+        os.environ[k] = v
+
+# Cloud mode: NIM_API_KEY is present (set in Streamlit Cloud dashboard)
+# Local mode: no NIM_API_KEY → use LM Studio
+CLOUD_MODE = bool(os.environ.get("NIM_API_KEY"))
 
 
 # ── Cookies (browser UUID for "user" identity, no login) ──────────────────────
