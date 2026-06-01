@@ -8,17 +8,50 @@ import libsql_experimental as libsql
 
 # ── Client ────────────────────────────────────────────────────────────────────
 
-def make_client():
-    """
-    Returns a libsql connection.
-    Reads TURSO_URL + TURSO_TOKEN from env (or st.secrets — caller's job).
-    Falls back to local SQLite file for dev.
-    """
+def _raw_connect():
     url   = os.environ.get("TURSO_URL", "")
     token = os.environ.get("TURSO_TOKEN", "")
     if url:
         return libsql.connect(url, auth_token=token)
     return libsql.connect("file:lexmy.db")
+
+
+class _Conn:
+    """
+    Wrapper that auto-reconnects when Turso closes an idle Hrana stream.
+    Symptom we catch: ValueError 'Hrana: api error: status=404 ... stream not found'.
+    """
+    def __init__(self):
+        self._raw = _raw_connect()
+
+    def _is_dead_stream(self, err: Exception) -> bool:
+        s = str(err)
+        return "stream not found" in s or "stream closed" in s
+
+    def execute(self, sql: str, params=()):
+        try:
+            return self._raw.execute(sql, params)
+        except (ValueError, Exception) as e:
+            if self._is_dead_stream(e):
+                self._raw = _raw_connect()
+                return self._raw.execute(sql, params)
+            raise
+
+    def commit(self):
+        try:
+            self._raw.commit()
+        except Exception as e:
+            if self._is_dead_stream(e):
+                self._raw = _raw_connect()
+                try:
+                    self._raw.commit()
+                except Exception:
+                    pass
+
+
+def make_client():
+    """Reads TURSO_URL + TURSO_TOKEN from env. Local SQLite fallback for dev."""
+    return _Conn()
 
 
 def _exec(client, sql: str, params: list = None):
