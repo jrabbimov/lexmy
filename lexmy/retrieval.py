@@ -78,6 +78,8 @@ def retrieve_one(sub_query: str, coll, top_k: int = 4, business_form: str = "") 
 def retrieve_all(
     sub_queries: list,
     coll,
+    graph=None,
+    vocab=None,
     top_k: int = 4,
     business_form: str = "",
     use_graph: bool = False,
