@@ -56,7 +56,7 @@ def format_recent(recent_qas: list) -> str:
 
 def rag_answer(question: str,
                *,
-               coll, graph, vocab, sections_full,
+               coll, sections_full,
                client, model, disable_thinking,
                business_form: str = "",
                profile: str = "",
@@ -71,7 +71,7 @@ def rag_answer(question: str,
     """
     recent_qas  = recent_qas or []
     sub_queries = split_query(question)
-    chunks      = retrieve_all(sub_queries, coll, graph, vocab, top_k, business_form)
+    chunks      = retrieve_all(sub_queries, coll, top_k=top_k, business_form=business_form)
     sources     = [c["meta"].get("section_id", "") for c in chunks]
 
     prompt = ANSWER_PROMPT.format(

@@ -8,10 +8,10 @@ from .prompt import SYSTEM_PROMPT, SUMMARY_PROMPT
 
 # ── Backend config ────────────────────────────────────────────────────────────
 
-NIM_BASE          = "https://integrate.api.nvidia.com/v1"
-NIM_MODEL_DEFAULT = "deepseek-ai/deepseek-r1"
-LMSTUDIO_BASE     = "http://localhost:1234/v1"
-LMSTUDIO_MODEL    = "qwen/qwen3.5-2b"
+NIM_BASE = "https://integrate.api.nvidia.com/v1"
+NIM_MODEL_DEFAULT = "deepseek-ai/deepseek-v4-flash"
+LMSTUDIO_BASE = "http://localhost:1234/v1"
+LMSTUDIO_MODEL = "qwen/qwen3.5-2b"
 
 
 def make_client(backend: str = "nim", api_key: str = "") -> tuple:
@@ -21,7 +21,7 @@ def make_client(backend: str = "nim", api_key: str = "") -> tuple:
     NIM model can be overridden via NIM_MODEL env var.
     """
     if backend == "nim":
-        key   = api_key or os.environ.get("NIM_API_KEY", "") or "no-key-set"
+        key = api_key or os.environ.get("NIM_API_KEY", "") or "no-key-set"
         model = os.environ.get("NIM_MODEL", NIM_MODEL_DEFAULT)
         return OpenAI(base_url=NIM_BASE, api_key=key), model, True
     elif backend == "lmstudio":
@@ -42,7 +42,7 @@ def llm_call(
     prompt: str,
     system: str = SYSTEM_PROMPT,
     disable_thinking: bool = False,
-    max_tokens: int = 1024,
+    max_tokens: int = 512,
     temp: float = 0.0,
     top_p: float = 0.95,
 ) -> str:
@@ -83,7 +83,7 @@ def stream_call(
     prompt: str,
     system: str = SYSTEM_PROMPT,
     disable_thinking: bool = False,
-    max_tokens: int = 1024,
+    max_tokens: int = 512,
     temp: float = 0.0,
     top_p: float = 0.95,
 ):

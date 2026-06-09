@@ -61,8 +61,6 @@ user_id = cookies["user_id"]
 def load_artifacts():
     return {
         "coll":          retrieval.load_chroma(),
-        "graph":         retrieval.load_graph(),
-        "vocab":         retrieval.load_concept_vocab(),
         "sections_full": retrieval.load_sections_full(),
     }
 
@@ -87,7 +85,6 @@ with st.sidebar:
 
     if st.button("➕ New project", use_container_width=True):
         st.session_state["new_project"] = True
-        st.session_state["active_project_id"] = None
 
     projects = storage.list_projects(DB, user_id)
 
@@ -225,7 +222,7 @@ if question:
         try:
             gen = rag_answer(
                 question,
-                coll=ART["coll"], graph=ART["graph"], vocab=ART["vocab"],
+                coll=ART["coll"],
                 sections_full=ART["sections_full"],
                 client=llm_client, model=llm_model, disable_thinking=disable_thinking,
                 business_form=project["business_form"],
