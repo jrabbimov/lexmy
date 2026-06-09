@@ -9,8 +9,7 @@ User's project context:
 {recent}
 
 Rules:
-- Be as concise as possible. Avoid unnecessary elaboration.
-- State only the key legal facts. No preamble, no explanation of what you are doing.
+- Be concise and factual.
 - Use easy English.
 - Cite the section ID in brackets, e.g. [pdpa_s6] or [act777_s210].
 - Do NOT start your answer with phrases like "Based on the provided legal sections" or "According to the provided sections".
