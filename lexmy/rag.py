@@ -137,20 +137,28 @@ def rag_answer(question: str,
     if stream:
         def _gen():
             parts = []
-            for piece in stream_call(client, model, prompt,
-                                     disable_thinking=disable_thinking, max_tokens=700):
-                parts.append(piece)
-                yield ("chunk", piece)
-            # Reasoning models sometimes stream only their hidden reasoning and
-            # emit no visible content. Retry once non-streaming before giving up.
-            if not "".join(parts).strip():
-                retry = llm_call(client, model, prompt,
-                                 disable_thinking=disable_thinking, max_tokens=700)
-                if retry.strip():
-                    parts = [retry]
-                    yield ("chunk", retry)
+            # NIM streaming is occasionally flaky: it can throw a JSON-decode
+            # error mid-stream, or finish having emitted only hidden reasoning
+            # (no visible content). Catch both and fall back to a non-streaming
+            # call so the user still gets an answer.
+            try:
+                for piece in stream_call(client, model, prompt,
+                                         disable_thinking=disable_thinking, max_tokens=700):
+                    parts.append(piece)
+                    yield ("chunk", piece)
+            except Exception:
+                pass  # streaming failed — fall through to non-stream fallback
+            answer = "".join(parts).strip()
+            if not answer:
+                try:
+                    answer = llm_call(client, model, prompt,
+                                      disable_thinking=disable_thinking, max_tokens=700).strip()
+                except Exception:
+                    answer = ""
+                if answer:
+                    yield ("chunk", answer)
             yield ("done", {
-                "answer":       "".join(parts).strip(),
+                "answer":       answer,
                 "sources":      sources,
                 "sub_queries":  sub_queries,
                 "query_method": query_method,

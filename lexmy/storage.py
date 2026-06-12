@@ -181,6 +181,17 @@ def append_qa(client, project_id: str, question: str, answer: str, sources: list
     _commit(client)
 
 
+def delete_qa(client, project_id: str, qa_id: int):
+    """Delete a single Q&A turn (e.g. a turn ruined by an exception during a demo)."""
+    _exec(client, "DELETE FROM qa_history WHERE id = ? AND project_id = ?",
+          [qa_id, project_id])
+    _exec(client,
+        "UPDATE projects SET qa_count = MAX(qa_count - 1, 0) WHERE id = ?",
+        [project_id],
+    )
+    _commit(client)
+
+
 def _qa_row(r: tuple) -> dict:
     return {
         "id": r[0], "question": r[1], "answer": r[2],

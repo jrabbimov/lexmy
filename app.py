@@ -126,6 +126,15 @@ with st.sidebar:
     )
     st.session_state["show_planning"] = show_planning
 
+    # Hidden demo helper: when on, each turn gets a small 🗑 button so a turn
+    # ruined by an exception can be removed without deleting the whole project.
+    manage_msgs = st.toggle(
+        "🗑️ Manage messages",
+        value=st.session_state.get("manage_msgs", False),
+        help="Show a delete button on each turn to remove individual Q&As.",
+    )
+    st.session_state["manage_msgs"] = manage_msgs
+
 
 # ── LLM client (rebuilt when backend changes) ─────────────────────────────────
 
@@ -247,6 +256,13 @@ for h in history:
         st.markdown(highlight_citations(h["answer"]))
         render_turn_meta(h.get("planning"))
         render_sources(h["sources"])
+        if st.session_state.get("manage_msgs"):
+            if st.button("🗑 Delete this turn", key=f"del_{h['id']}"):
+                with st.spinner("Removing turn and rebuilding summary…"):
+                    storage.delete_qa(DB, project["id"], h["id"])
+                    memory.rebuild_summary(DB, project["id"],
+                                           llm_client, llm_model, disable_thinking)
+                st.rerun()
 
 
 # Chat input

@@ -28,3 +28,14 @@ def maybe_update_summary(client_db, project: dict, llm_client, llm_model, disabl
     new_summary = summarise(llm_client, llm_model, history, disable_thinking=disable_thinking)
     storage.update_project(client_db, project["id"], summary=new_summary)
     project["summary"] = new_summary
+
+
+def rebuild_summary(client_db, project_id: str, llm_client, llm_model, disable_thinking: bool) -> str:
+    """Recompute the rolling summary from whatever history remains — used after a
+    turn is deleted so the summary no longer references the removed exchange.
+    Clears the summary when no history is left."""
+    history = storage.list_qa(client_db, project_id)
+    new_summary = (summarise(llm_client, llm_model, history, disable_thinking=disable_thinking)
+                   if history else "")
+    storage.update_project(client_db, project_id, summary=new_summary)
+    return new_summary

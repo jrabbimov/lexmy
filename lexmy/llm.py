@@ -48,7 +48,10 @@ def llm_call(
 ) -> str:
     """
     Stream a completion. Retries forever on 429 (rate limit). Never returns None.
+    Transient stream errors (e.g. NIM sending a malformed SSE chunk that the
+    client cannot JSON-decode) are retried once, then yield "" rather than raise.
     """
+    transient_retries = 0
     while True:
         try:
             kwargs = dict(
@@ -75,6 +78,11 @@ def llm_call(
             return "".join(parts).strip()
         except RateLimitError:
             time.sleep(60)
+        except Exception:
+            transient_retries += 1
+            if transient_retries >= 2:
+                return ""   # give up gracefully; callers handle empty string
+            time.sleep(1)
 
 
 def stream_call(
