@@ -143,7 +143,7 @@ def rag_answer(question: str,
             # call so the user still gets an answer.
             try:
                 for piece in stream_call(client, model, prompt,
-                                         disable_thinking=disable_thinking, max_tokens=700):
+                                         disable_thinking=disable_thinking, max_tokens=1024):
                     parts.append(piece)
                     yield ("chunk", piece)
             except Exception:
@@ -152,7 +152,7 @@ def rag_answer(question: str,
             if not answer:
                 try:
                     answer = llm_call(client, model, prompt,
-                                      disable_thinking=disable_thinking, max_tokens=700).strip()
+                                      disable_thinking=disable_thinking, max_tokens=1024).strip()
                 except Exception:
                     answer = ""
                 if answer:
