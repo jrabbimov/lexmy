@@ -281,9 +281,18 @@ if question:
                     placeholder.markdown("".join(parts) + " ▌")
                 elif kind == "done":
                     final = payload
-            placeholder.markdown(highlight_citations(final["answer"]))
+            answer_text = (final["answer"] if final else "").strip()
+            if not answer_text:
+                placeholder.warning("⚠️ The model returned an empty response. Please ask again.")
+            else:
+                placeholder.markdown(highlight_citations(answer_text))
         except Exception as e:
             placeholder.error(f"LLM error: {e}")
+            st.stop()
+
+        # Empty answer → don't persist (would pollute history + memory). Let the
+        # user retry without a rerun.
+        if not answer_text:
             st.stop()
 
         planning = {
@@ -295,7 +304,7 @@ if question:
         render_sources(final["sources"])
 
     # Persist + maybe summarise
-    storage.append_qa(DB, project["id"], question, final["answer"], final["sources"],
+    storage.append_qa(DB, project["id"], question, answer_text, final["sources"],
                       planning=planning)
     project = storage.get_project(DB, project["id"])   # refresh qa_count
     memory.maybe_update_summary(DB, project, llm_client, llm_model, disable_thinking)

@@ -137,9 +137,18 @@ def rag_answer(question: str,
     if stream:
         def _gen():
             parts = []
-            for piece in stream_call(client, model, prompt, disable_thinking=disable_thinking):
+            for piece in stream_call(client, model, prompt,
+                                     disable_thinking=disable_thinking, max_tokens=700):
                 parts.append(piece)
                 yield ("chunk", piece)
+            # Reasoning models sometimes stream only their hidden reasoning and
+            # emit no visible content. Retry once non-streaming before giving up.
+            if not "".join(parts).strip():
+                retry = llm_call(client, model, prompt,
+                                 disable_thinking=disable_thinking, max_tokens=700)
+                if retry.strip():
+                    parts = [retry]
+                    yield ("chunk", retry)
             yield ("done", {
                 "answer":       "".join(parts).strip(),
                 "sources":      sources,
