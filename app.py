@@ -2,6 +2,7 @@
 import logging
 import os
 import re
+import time
 import uuid
 
 # Suppress transformers __path__ alias warnings before any import touches the lib
@@ -116,6 +117,15 @@ with st.sidebar:
         backend = "lmstudio"
         st.caption("🖥️ Local mode — LM Studio")
 
+    st.divider()
+    show_planning = st.toggle(
+        "🔍 Show query planning",
+        value=st.session_state.get("show_planning", True),
+        help="Reveal the search sub-queries the planner produced, and whether they "
+             "were LLM-generated (rewritten/split/expanded) or rule-split as fallback.",
+    )
+    st.session_state["show_planning"] = show_planning
+
 
 # ── LLM client (rebuilt when backend changes) ─────────────────────────────────
 
@@ -177,6 +187,34 @@ def render_sources(source_ids: list):
                 st.markdown(body)
 
 
+_PLAN_LABEL = {
+    "generated":  ("🤖 LLM-generated", "rewritten / split / expanded from the question"),
+    "unchanged":  ("➡️ Passed through", "already a clean query — used as-is"),
+    "rule-split": ("✂️ Rule-split", "LLM planner unavailable — regex fallback"),
+}
+
+def render_planning(sub_queries: list, method: str):
+    """Show the search sub-queries and how the planner produced them."""
+    if not st.session_state.get("show_planning") or not sub_queries:
+        return
+    label, desc = _PLAN_LABEL.get(method, (method, ""))
+    with st.expander(f"🔍 Query planning — {label} ({len(sub_queries)})"):
+        st.caption(desc)
+        for i, q in enumerate(sub_queries, 1):
+            st.markdown(f"{i}. `{q}`")
+
+
+def render_turn_meta(planning: dict):
+    """Render the timing caption + query-planning panel for one turn.
+    Works for both the live answer and replayed history."""
+    if not planning:
+        return
+    elapsed = planning.get("elapsed")
+    if elapsed is not None:
+        st.caption(f"⏱️ {elapsed:.1f}s")
+    render_planning(planning.get("sub_queries", []), planning.get("query_method", ""))
+
+
 # Profile card (editable)
 with st.container(border=True):
     c1, c2 = st.columns([4, 1])
@@ -207,6 +245,7 @@ for h in history:
         st.markdown(h["question"])
     with st.chat_message("assistant"):
         st.markdown(highlight_citations(h["answer"]))
+        render_turn_meta(h.get("planning"))
         render_sources(h["sources"])
 
 
@@ -219,18 +258,23 @@ if question:
     with st.chat_message("assistant"):
         placeholder = st.empty()
         parts, final = [], None
+        t0 = time.time()
         try:
-            gen = rag_answer(
-                question,
-                coll=ART["coll"],
-                sections_full=ART["sections_full"],
-                client=llm_client, model=llm_model, disable_thinking=disable_thinking,
-                business_form=project["business_form"],
-                profile=memory.profile_string(project),
-                summary=project["summary"],
-                recent_qas=storage.last_qa(DB, project["id"], 3),
-                stream=True,
-            )
+            # Planning + retrieval happen synchronously when the generator is
+            # built — cover that wait with a spinner.
+            with st.spinner("🔍 Searching legal sections…"):
+                gen = rag_answer(
+                    question,
+                    coll=ART["coll"],
+                    sections_full=ART["sections_full"],
+                    client=llm_client, model=llm_model, disable_thinking=disable_thinking,
+                    business_form=project["business_form"],
+                    profile=memory.profile_string(project),
+                    summary=project["summary"],
+                    recent_qas=storage.last_qa(DB, project["id"], 3),
+                    stream=True,
+                )
+            placeholder.markdown("✍️ _Generating answer…_")
             for kind, payload in gen:
                 if kind == "chunk":
                     parts.append(payload)
@@ -242,10 +286,17 @@ if question:
             placeholder.error(f"LLM error: {e}")
             st.stop()
 
+        planning = {
+            "sub_queries":  final.get("sub_queries", []),
+            "query_method": final.get("query_method", ""),
+            "elapsed":      round(time.time() - t0, 1),
+        }
+        render_turn_meta(planning)
         render_sources(final["sources"])
 
     # Persist + maybe summarise
-    storage.append_qa(DB, project["id"], question, final["answer"], final["sources"])
+    storage.append_qa(DB, project["id"], question, final["answer"], final["sources"],
+                      planning=planning)
     project = storage.get_project(DB, project["id"])   # refresh qa_count
     memory.maybe_update_summary(DB, project, llm_client, llm_model, disable_thinking)
     st.rerun()

@@ -87,9 +87,15 @@ def init_schema(client):
             question    TEXT,
             answer      TEXT,
             sources     TEXT,
+            planning    TEXT DEFAULT '',
             created_at  TEXT DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # Migration for DBs created before the planning column existed.
+    try:
+        _exec(client, "ALTER TABLE qa_history ADD COLUMN planning TEXT DEFAULT ''")
+    except Exception:
+        pass  # column already present
     _exec(client, "CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id)")
     _exec(client, "CREATE INDEX IF NOT EXISTS idx_qa_project    ON qa_history(project_id)")
     _commit(client)
@@ -161,10 +167,12 @@ def delete_project(client, project_id: str):
 
 # ── Q&A history ───────────────────────────────────────────────────────────────
 
-def append_qa(client, project_id: str, question: str, answer: str, sources: list):
+def append_qa(client, project_id: str, question: str, answer: str, sources: list,
+              planning: dict = None):
     _exec(client,
-        "INSERT INTO qa_history (project_id, question, answer, sources) VALUES (?, ?, ?, ?)",
-        [project_id, question, answer, json.dumps(sources)],
+        "INSERT INTO qa_history (project_id, question, answer, sources, planning) "
+        "VALUES (?, ?, ?, ?, ?)",
+        [project_id, question, answer, json.dumps(sources), json.dumps(planning or {})],
     )
     _exec(client,
         "UPDATE projects SET qa_count = qa_count + 1 WHERE id = ?",
@@ -173,36 +181,32 @@ def append_qa(client, project_id: str, question: str, answer: str, sources: list
     _commit(client)
 
 
+def _qa_row(r: tuple) -> dict:
+    return {
+        "id": r[0], "question": r[1], "answer": r[2],
+        "sources": json.loads(r[3] or "[]"),
+        "planning": json.loads(r[4] or "{}"),
+        "created_at": r[5],
+    }
+
+
 def list_qa(client, project_id: str, limit: int = 0) -> list:
     """Return Q&A history in chronological order (oldest first)."""
-    sql = ("SELECT id, question, answer, sources, created_at "
+    sql = ("SELECT id, question, answer, sources, planning, created_at "
            "FROM qa_history WHERE project_id = ? ORDER BY id ASC")
     params = [project_id]
     if limit > 0:
         sql += " LIMIT ?"
         params.append(limit)
     rows = _exec(client, sql, params).fetchall()
-    return [
-        {
-            "id": r[0], "question": r[1], "answer": r[2],
-            "sources": json.loads(r[3] or "[]"), "created_at": r[4],
-        }
-        for r in rows
-    ]
+    return [_qa_row(r) for r in rows]
 
 
 def last_qa(client, project_id: str, n: int) -> list:
     """Most recent n Q&As (in chronological order)."""
     rows = _exec(client,
-        "SELECT id, question, answer, sources, created_at "
+        "SELECT id, question, answer, sources, planning, created_at "
         "FROM qa_history WHERE project_id = ? ORDER BY id DESC LIMIT ?",
         [project_id, n],
     ).fetchall()
-    result = [
-        {
-            "id": r[0], "question": r[1], "answer": r[2],
-            "sources": json.loads(r[3] or "[]"), "created_at": r[4],
-        }
-        for r in rows
-    ]
-    return list(reversed(result))
+    return list(reversed([_qa_row(r) for r in rows]))

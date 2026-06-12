@@ -2,15 +2,16 @@
 import re
 import json
 
-from .prompt    import ANSWER_PROMPT
+from .prompt    import ANSWER_PROMPT, QUERY_REWRITE_PROMPT
 from .llm       import llm_call, stream_call
 from .retrieval import retrieve_all
 
 
-# ── Query splitter (rule-based) ────────────────────────────────────────────────
+# ── Query splitter (rule-based fallback) ───────────────────────────────────────
 
 def split_query(query: str) -> list:
-    """Break complex questions into focused sub-queries. Returns ≥ 1 item."""
+    """Break complex questions into focused sub-queries. Returns ≥ 1 item.
+    Pure-regex fallback used when the LLM router is unavailable or fails."""
     q = query.strip()
 
     # Multiple sentences ending with "?"
@@ -24,6 +25,53 @@ def split_query(query: str) -> list:
         return [p.strip() for p in and_parts]
 
     return [q]
+
+
+# ── Query router (LLM: pass / split / rewrite / expand) ────────────────────────
+
+def plan_queries(question: str, client, model, *,
+                 recent_qas: list = None, disable_thinking: bool = False) -> tuple:
+    """Use the LLM to turn the raw question + history into standalone search
+    queries. Decides per-question whether to pass through, split, rewrite
+    (resolve pronouns from history), or expand (broad → facet queries).
+    Falls back to the regex splitter on any failure.
+
+    Returns (queries, method) where method is:
+      'generated'  – LLM router produced the queries (rewrite / split / expand)
+      'unchanged'  – LLM router returned the question as-is (single query)
+      'rule-split' – LLM failed; regex fallback split the question
+    """
+    prompt = QUERY_REWRITE_PROMPT.format(
+        recent   = format_recent(recent_qas or []),
+        question = question,
+    )
+    try:
+        raw = llm_call(client, model, prompt,
+                       system="You output only a JSON array of search-query strings.",
+                       disable_thinking=disable_thinking,
+                       max_tokens=200, temp=0.0, top_p=1.0)
+        m = re.search(r"\[.*\]", raw, re.DOTALL)
+        queries = json.loads(m.group(0)) if m else []
+        queries = [q.strip() for q in queries if isinstance(q, str) and q.strip()]
+        # drop duplicates (case-insensitive), preserve order — weak models
+        # sometimes repeat the same query several times.
+        seen, deduped = set(), []
+        for q in queries:
+            k = q.lower()
+            if k not in seen:
+                seen.add(k)
+                deduped.append(q)
+        queries = deduped
+        if queries:
+            queries = queries[:4]
+            # passed through unchanged vs actively rewritten/split/expanded
+            unchanged = (len(queries) == 1
+                         and queries[0].strip().rstrip("?").lower()
+                             == question.strip().rstrip("?").lower())
+            return queries, ("unchanged" if unchanged else "generated")
+    except Exception:
+        pass
+    return split_query(question), "rule-split"
 
 
 # ── Context formatting ─────────────────────────────────────────────────────────
@@ -62,7 +110,8 @@ def rag_answer(question: str,
                profile: str = "",
                summary: str = "",
                recent_qas: list = None,
-               top_k: int = 4,
+               top_k: int = 5,
+               max_sections: int = 12,
                stream: bool = False):
     """
     Run full pipeline. Returns dict with answer + sources + sub_queries.
@@ -70,8 +119,11 @@ def rag_answer(question: str,
     where kind ∈ {"chunk", "done"}.
     """
     recent_qas  = recent_qas or []
-    sub_queries = split_query(question)
+    sub_queries, query_method = plan_queries(
+        question, client, model,
+        recent_qas=recent_qas, disable_thinking=disable_thinking)
     chunks      = retrieve_all(sub_queries, coll, top_k=top_k, business_form=business_form)
+    chunks      = chunks[:max_sections]
     sources     = [c["meta"].get("section_id", "") for c in chunks]
 
     prompt = ANSWER_PROMPT.format(
@@ -89,17 +141,19 @@ def rag_answer(question: str,
                 parts.append(piece)
                 yield ("chunk", piece)
             yield ("done", {
-                "answer":      "".join(parts).strip(),
-                "sources":     sources,
-                "sub_queries": sub_queries,
-                "n_chunks":    len(chunks),
+                "answer":       "".join(parts).strip(),
+                "sources":      sources,
+                "sub_queries":  sub_queries,
+                "query_method": query_method,
+                "n_chunks":     len(chunks),
             })
         return _gen()
 
     answer = llm_call(client, model, prompt, disable_thinking=disable_thinking)
     return {
-        "answer":      answer,
-        "sources":     sources,
-        "sub_queries": sub_queries,
-        "n_chunks":    len(chunks),
+        "answer":       answer,
+        "sources":      sources,
+        "sub_queries":  sub_queries,
+        "query_method": query_method,
+        "n_chunks":     len(chunks),
     }
