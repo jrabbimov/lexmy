@@ -3,14 +3,12 @@ import logging
 import os
 import re
 import time
-import uuid
 
 # Suppress transformers __path__ alias warnings before any import touches the lib
 os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
 logging.getLogger("transformers").setLevel(logging.ERROR)
 
 import streamlit as st
-from streamlit_cookies_manager import EncryptedCookieManager
 
 from lexmy import storage, memory, retrieval
 from lexmy.llm import make_client
@@ -43,17 +41,10 @@ for k in ("TURSO_URL", "TURSO_TOKEN", "NIM_API_KEY", "NIM_MODEL", "COOKIE_PASSWO
 CLOUD_MODE = bool(os.environ.get("NIM_API_KEY"))
 
 
-# ── Cookies (browser UUID for "user" identity, no login) ──────────────────────
+# ── Shared identity (demo app: no login, everyone sees all projects) ──────────
 
-_cookie_pw = os.environ.get("COOKIE_PASSWORD", "lexmy-local-dev-only-key-32chars!")
-cookies = EncryptedCookieManager(prefix="lexmy/", password=_cookie_pw)
-if not cookies.ready():
-    st.stop()
-
-if "user_id" not in cookies or not cookies["user_id"]:
-    cookies["user_id"] = str(uuid.uuid4())
-    cookies.save()
-user_id = cookies["user_id"]
+# All projects are created under one shared owner and listed for every visitor.
+user_id = "shared"
 
 
 # ── Cached resources (load artifacts once per session) ────────────────────────
@@ -87,7 +78,7 @@ with st.sidebar:
     if st.button("➕ New project", use_container_width=True):
         st.session_state["new_project"] = True
 
-    projects = storage.list_projects(DB, user_id)
+    projects = storage.list_all_projects(DB)
 
     if projects:
         labels = {p["id"]: p["name"] for p in projects}

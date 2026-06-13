@@ -119,6 +119,22 @@ def list_projects(client, user_id: str) -> list:
     ]
 
 
+def list_all_projects(client) -> list:
+    """Every project, regardless of owner (demo app: shared, no login)."""
+    rows = _exec(client,
+        "SELECT id, name, industry, business_form, summary, qa_count, created_at "
+        "FROM projects ORDER BY created_at DESC",
+    ).fetchall()
+    return [
+        {
+            "id": r[0], "name": r[1], "industry": r[2] or "",
+            "business_form": r[3] or "", "summary": r[4] or "",
+            "qa_count": r[5] or 0, "created_at": r[6],
+        }
+        for r in rows
+    ]
+
+
 def get_project(client, project_id: str) -> dict | None:
     rows = _exec(client,
         "SELECT id, user_id, name, industry, business_form, summary, qa_count, created_at "
